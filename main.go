@@ -1,23 +1,24 @@
 package main
 
 import (
+	"math/rand"
 	"time"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 )
 
-const boardX int = 22
-const boardY int = 12
+const boardY int = 22
+const boardX int = 12
 
 type Point struct {
-	x int
 	y int
+	x int
 }
 
 type shape interface {
 	init()
-	move(x int, y int)
+	move(y int, x int)
 	getLocation() []Point
 	getColor() tcell.Color
 }
@@ -31,13 +32,44 @@ type line struct {
 	shapeStruct
 }
 
+type plus struct {
+	shapeStruct
+}
+
+type square struct {
+	shapeStruct
+}
+
+func (s *square) init() {
+	s.location = []Point{{1, 1}, {1, 2}, {2, 1}, {2, 2}}
+	s.color = tcell.ColorBlue
+}
+
+func (p *plus) init() {
+	p.location = []Point{{1, 1}, {1, 2}, {1, 3}, {2, 2}}
+	p.color = tcell.ColorYellow
+}
+
 func (l *line) init() {
 	l.location = []Point{{1, 1}, {1, 2}, {1, 3}, {1, 4}}
 	l.color = tcell.ColorPurple
 }
 
-func (s *shapeStruct) move(x int, y int) {
-	movePiece(x, y, s.location[:], s.getColor())
+func (s *shapeStruct) move(y int, x int) {
+	for _, l := range s.location {
+		if board[l.y][l.x+x] != tcell.ColorWhite {
+			return
+		}
+		if board[l.y+y][l.x] != tcell.ColorWhite {
+			stopMove()
+			return
+		}
+	}
+	for i, l := range s.location {
+		l.y += y
+		l.x += x
+		s.location[i] = l
+	}
 }
 
 func (s *shapeStruct) getColor() tcell.Color {
@@ -48,7 +80,7 @@ func (s *shapeStruct) getLocation() []Point {
 	return s.location
 }
 
-var board [boardX][boardY]tcell.Color
+var board [boardY][boardX]tcell.Color
 
 var (
 	table   *tview.Table
@@ -57,34 +89,21 @@ var (
 )
 
 func stopMove() {
-	// for _, s := range current {
-	// 	board[s.y][s.x] = "b"
-	// }
-	// current[0] = Point{1, 1}
-	// current[1] = Point{1, 2}
-	// current[2] = Point{2, 2}
-	// current[3] = Point{2, 3}
-}
-
-func drawPiece(location []Point, pieceColor tcell.Color) {
-
-}
-
-func movePiece(x int, y int, location []Point, pieceColor tcell.Color) {
-	for _, s := range location {
-		if board[s.x][s.y+y] != tcell.ColorWhite {
-			return
-		}
-		if board[s.x+x][s.y] != tcell.ColorWhite {
-			stopMove()
-			return
-		}
+	color := current.getColor()
+	for _, s := range current.getLocation() {
+		board[s.y][s.x] = color
 	}
-	for i, s := range location {
-		s.x += x
-		s.y += y
-		location[i] = s
+	r := rand.Intn(3)
+	switch r {
+	case 0:
+		current = &line{}
+		break
+	case 1:
+		current = &plus{}
+	case 2:
+		current = &square{}
 	}
+	current.init()
 }
 
 func updateTime() {
@@ -98,28 +117,42 @@ func updateTime() {
 }
 
 func drawBoard() {
-	for x, l := range board {
-		for y, v := range l {
-			table.SetCell(x, 2*y, tview.NewTableCell("").SetBackgroundColor(v))
-			table.SetCell(x, 2*y+1, tview.NewTableCell("").SetBackgroundColor(v))
+	for y, l := range board {
+		for x, v := range l {
+			// b := table.GetCell(y, 2*x).BackgroundColor
+			// fmt.Println(b)
+			//if table.GetCell(y, 2*x).BackgroundColor != v {
+			table.GetCell(y, 2*x).SetBackgroundColor(v)
+			table.GetCell(y, 2*x+1).SetBackgroundColor(v)
+			// table.SetCell(y, 2*x, tview.NewTableCell("").SetBackgroundColor(v))
+			// table.SetCell(y, 2*x+1, tview.NewTableCell("").SetBackgroundColor(v))
+			//}
 		}
 	}
 	for _, s := range current.getLocation() {
-		table.SetCell(s.x, 2*s.y, tview.NewTableCell("").SetBackgroundColor(current.getColor()))
-		table.SetCell(s.x, 2*s.y+1, tview.NewTableCell("").SetBackgroundColor(current.getColor()))
+		table.GetCell(s.y, 2*s.x).SetBackgroundColor(current.getColor())
+		table.GetCell(s.y, 2*s.x+1).SetBackgroundColor(current.getColor())
+		// table.SetCell(s.y, 2*s.x, tview.NewTableCell("").SetBackgroundColor(current.getColor()))
+		// table.SetCell(s.y, 2*s.x+1, tview.NewTableCell("").SetBackgroundColor(current.getColor()))
 	}
 }
 
 func initBoard() {
-	for x := 0; x < boardX; x++ {
-		for y := 0; y < boardY; y++ {
+	for y := 0; y < boardY; y++ {
+		for x := 0; x < boardX; x++ {
 			if x == 0 || x == boardX-1 || y == 0 || y == boardY-1 {
-				board[x][y] = tcell.ColorBlack
+				board[y][x] = tcell.ColorBlack
 			} else {
-				board[x][y] = tcell.ColorWhite
+				board[y][x] = tcell.ColorWhite
 			}
+			table.SetCell(y, 2*x, tview.NewTableCell("").SetBackgroundColor(board[y][x]))
+			table.SetCell(y, 2*x+1, tview.NewTableCell("").SetBackgroundColor(board[y][x]))
 		}
 	}
+}
+
+func checkBoard() {
+	//for
 }
 
 func main() {
@@ -140,15 +173,12 @@ func main() {
 		switch event.Key() {
 		case tcell.KeyLeft:
 			current.move(0, -1)
-			// movePiece(0, -1)
 			break
 		case tcell.KeyRight:
 			current.move(0, 1)
-			// movePiece(0, 1)
 			break
 		case tcell.KeyDown:
 			current.move(1, 0)
-			// movePiece(1, 0)
 			break
 		}
 		drawBoard()
